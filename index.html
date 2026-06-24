@@ -17,7 +17,6 @@
                         ludo: { red: '#ef4444', green: '#22c55e', yellow: '#eab308', blue: '#3b82f6', safe: '#94a3b8' }
                     },
                     animation: {
-                        'spin-fast': 'spin 0.4s linear infinite',
                         'bounce-slight': 'bounceSlight 1s infinite',
                         'pulse-glow': 'pulseGlow 2s infinite',
                     },
@@ -90,7 +89,7 @@
         
         /* Dice specific styles */
         .dice-3d {
-            width: 60px; height: 60px; transform-style: preserve-3d; transition: transform 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            width: 60px; height: 60px; transform-style: preserve-3d;
         }
         .dice-face {
             position: absolute; width: 100%; height: 100%; background: white; border: 2px solid #ddd;
@@ -101,12 +100,19 @@
         .dot { background: #333; border-radius: 50%; margin: auto; width: 10px; height: 10px; }
         .dark .dot { background: #f8fafc; }
         
+        @keyframes rollDiceAnim {
+            0% { transform: rotate(0deg) scale(1); }
+            50% { transform: rotate(180deg) scale(1.2); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+        .rolling-dice { animation: rollDiceAnim 0.5s ease-in-out; }
+        
         /* Home Triangle Center */
         .home-center {
             position: absolute; top: 40%; left: 40%; width: 20%; height: 20%;
             overflow: hidden; display: flex; align-items: center; justify-content: center;
         }
-        .home-center::before { /* Hack for triangles */
+        .home-center::before {
             content: ""; position: absolute; width: 141.4%; height: 141.4%; background: conic-gradient(
                 #22c55e 0deg 90deg, #eab308 90deg 180deg, #3b82f6 180deg 270deg, #ef4444 270deg 360deg
             );
@@ -120,7 +126,6 @@
         .glass-panel { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1); }
         .dark .glass-panel { background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255,255,255,0.05); }
 
-        /* Dynamic PWA installation styling */
         #install-pwa-btn { display: none; }
     </style>
 </head>
@@ -173,7 +178,7 @@
 
         <!-- Online Lobby Menu -->
         <div id="screen-online-menu" class="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 hidden glass-panel backdrop-blur-xl">
-            <button onclick="App.showScreen('menu')" class="absolute top-6 left-6 p-2 bg-black/20 rounded-full"><i class="ph ph-arrow-left text-2xl"></i></button>
+            <button onclick="App.showScreen('screen-menu')" class="absolute top-6 left-6 p-2 bg-black/20 rounded-full"><i class="ph ph-arrow-left text-2xl"></i></button>
             <h2 class="text-3xl font-bold mb-8">Online Arena</h2>
             
             <div class="w-full max-w-sm space-y-6">
@@ -195,7 +200,7 @@
             </div>
         </div>
 
-        <!-- Room Setup / Lobby (Pre-game) -->
+        <!-- Room Setup / Lobby -->
         <div id="screen-lobby" class="absolute inset-0 z-30 flex flex-col p-4 hidden glass-panel backdrop-blur-xl">
             <div class="flex justify-between items-center mb-6">
                 <button onclick="App.leaveRoom()" class="p-2 bg-black/20 rounded-full"><i class="ph ph-arrow-left text-2xl"></i></button>
@@ -203,10 +208,9 @@
                     <h2 class="text-xl font-bold" id="lobby-title">Game Lobby</h2>
                     <p class="text-sm opacity-70" id="lobby-subtitle">Local Game</p>
                 </div>
-                <div class="w-10"></div> <!-- Balancer -->
+                <div class="w-10"></div>
             </div>
 
-            <!-- Online Code Banner -->
             <div id="lobby-code-banner" class="hidden w-full bg-gradient-to-r from-brand-600 to-purple-600 rounded-xl p-4 mb-6 flex justify-between items-center shadow-lg border border-white/20">
                 <div>
                     <p class="text-xs uppercase tracking-wider opacity-80">Room Code</p>
@@ -215,10 +219,7 @@
                 <button onclick="App.copyRoomCode()" class="p-3 bg-white/20 rounded-lg hover:bg-white/30 transition"><i class="ph ph-copy text-xl"></i></button>
             </div>
 
-            <!-- Players Setup -->
-            <div class="flex-grow space-y-3 overflow-y-auto" id="lobby-players">
-                <!-- Dynamically populated via JS -->
-            </div>
+            <div class="flex-grow space-y-3 overflow-y-auto" id="lobby-players"></div>
 
             <button id="start-game-btn" onclick="App.startGame()" class="mt-6 w-full bg-green-500 hover:bg-green-400 text-white font-bold py-4 rounded-xl shadow-lg transition active:scale-95 text-xl">Start Game</button>
         </div>
@@ -226,25 +227,17 @@
         <!-- Core Game Screen -->
         <div id="screen-game" class="absolute inset-0 z-20 flex flex-col hidden bg-gray-100 dark:bg-transparent">
             
-            <!-- Game Header -->
             <div class="flex justify-between items-center p-3 glass-panel z-10 shadow-md">
                 <button onclick="App.promptLeaveGame()" class="p-2 rounded-lg hover:bg-black/10"><i class="ph ph-list text-xl"></i></button>
-                <div class="flex gap-2" id="turn-indicator-badge">
-                    <span class="px-4 py-1 rounded-full text-sm font-bold bg-white text-black shadow">Player's Turn</span>
-                </div>
+                <div class="flex gap-2" id="turn-indicator-badge"></div>
                 <button onclick="App.toggleSound()" class="p-2 rounded-lg hover:bg-black/10"><i id="sound-icon" class="ph-fill ph-speaker-high text-xl"></i></button>
             </div>
 
-            <!-- Board Area -->
             <div class="flex-grow flex items-center justify-center p-2 relative overflow-hidden" id="board-wrapper">
                 <div class="board-container" id="ludo-board">
-                    <!-- Base Grid Background dynamically drawn to save DOM elements -->
                     <div id="board-bg" class="board-grid opacity-30"></div>
-                    
-                    <!-- Colored Paths -->
                     <div id="board-paths" class="board-grid absolute inset-0"></div>
                     
-                    <!-- Yards -->
                     <div class="yard yard-red" id="yard-red">
                         <div class="yard-inner"></div><div class="yard-inner"></div><div class="yard-inner"></div><div class="yard-inner"></div>
                     </div>
@@ -258,44 +251,32 @@
                         <div class="yard-inner"></div><div class="yard-inner"></div><div class="yard-inner"></div><div class="yard-inner"></div>
                     </div>
                     
-                    <!-- Center Base -->
                     <div class="home-center border-4 border-gray-800 dark:border-gray-200 bg-white shadow-inner"></div>
-                    
-                    <!-- Tokens -->
                     <div id="tokens-layer" class="absolute inset-0 pointer-events-none"></div>
                 </div>
             </div>
 
-            <!-- Game Controls / Player Profiles -->
             <div class="h-40 glass-panel rounded-t-3xl p-4 flex flex-col justify-between shadow-[0_-10px_40px_rgba(0,0,0,0.2)]">
-                <!-- Players Mini status -->
-                <div class="flex justify-between px-2" id="game-player-profiles">
-                    <!-- Dynamic -->
-                </div>
+                <div class="flex justify-between px-2" id="game-player-profiles"></div>
                 
-                <!-- Dice Area -->
                 <div class="flex justify-center items-end pb-2 relative">
-                    <div class="absolute left-4 bottom-2 text-xs opacity-50" id="room-status-mini"></div>
-                    
-                    <button id="dice-btn" onclick="Game.handleDiceClick()" class="relative group cursor-pointer active:scale-90 transition disabled:opacity-50 disabled:cursor-not-allowed">
-                        <div class="absolute -inset-4 bg-brand-500/20 rounded-full blur-lg group-hover:bg-brand-500/40 transition"></div>
+                    <button type="button" id="dice-btn" onclick="Game.handleDiceClick()" class="relative group cursor-pointer active:scale-90 transition disabled:opacity-50 disabled:cursor-not-allowed z-30">
+                        <div class="absolute -inset-4 bg-brand-500/20 rounded-full blur-lg group-hover:bg-brand-500/40 transition pointer-events-none"></div>
                         <div class="dice-3d relative" id="dice">
-                            <div class="dice-face" style="transform: translateZ(30px);">
-                                <div class="col-start-2 row-start-2 dot"></div>
+                            <div class="dice-face flex items-center justify-center font-bold text-2xl text-gray-300" style="transform: translateZ(30px);">
+                                <i class="ph ph-dots-three"></i>
                             </div>
                         </div>
-                        <!-- Instruction text -->
-                        <div id="dice-instruction" class="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 text-xs font-bold whitespace-nowrap animate-pulse">Your Turn</div>
+                        <div id="dice-instruction" class="absolute top-full mt-2 left-1/2 transform -translate-x-1/2 text-xs font-bold whitespace-nowrap animate-pulse pointer-events-none">Your Turn</div>
                     </button>
                     
-                    <div class="absolute right-4 bottom-2 flex gap-2">
+                    <div class="absolute right-4 bottom-2 flex gap-2 z-20">
                         <button onclick="UI.showEmojiPicker()" class="p-2 bg-black/20 rounded-full hover:bg-black/30"><i class="ph ph-smiley text-xl"></i></button>
                     </div>
                 </div>
             </div>
             
-            <!-- Emoji Floating Overlay -->
-            <div id="emoji-picker" class="absolute bottom-20 right-4 bg-white dark:bg-gray-800 p-2 rounded-xl shadow-xl flex gap-2 hidden border border-gray-200 dark:border-gray-700">
+            <div id="emoji-picker" class="absolute bottom-20 right-4 bg-white dark:bg-gray-800 p-2 rounded-xl shadow-xl flex gap-2 hidden border border-gray-200 dark:border-gray-700 z-40">
                 <button onclick="Game.sendEmoji('😂')" class="text-2xl hover:scale-125 transition">😂</button>
                 <button onclick="Game.sendEmoji('😡')" class="text-2xl hover:scale-125 transition">😡</button>
                 <button onclick="Game.sendEmoji('😭')" class="text-2xl hover:scale-125 transition">😭</button>
@@ -303,13 +284,11 @@
                 <button onclick="Game.sendEmoji('🎲')" class="text-2xl hover:scale-125 transition">🎲</button>
             </div>
             
-            <!-- Winner Overlay -->
             <div id="winner-overlay" class="absolute inset-0 bg-black/80 z-50 flex flex-col items-center justify-center hidden backdrop-blur-sm">
                 <i class="ph-fill ph-trophy text-8xl text-yellow-400 mb-4 animate-bounce"></i>
                 <h2 class="text-4xl font-extrabold text-white mb-2" id="winner-name">Player Wins!</h2>
-                <p class="text-brand-300 mb-8">+100 XP</p>
-                <div class="flex gap-4">
-                    <button onclick="App.showScreen('menu')" class="bg-gray-600 hover:bg-gray-500 text-white px-6 py-3 rounded-xl font-bold">Home</button>
+                <div class="flex gap-4 mt-8">
+                    <button onclick="App.showScreen('screen-menu')" class="bg-gray-600 hover:bg-gray-500 text-white px-6 py-3 rounded-xl font-bold">Home</button>
                     <button onclick="App.rematch()" id="rematch-btn" class="bg-brand-500 hover:bg-brand-400 text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-brand-500/50">Rematch</button>
                 </div>
             </div>
@@ -317,16 +296,11 @@
 
     </main>
 
-    <!-- Logic Script -->
     <script type="module">
-        // ==========================================
-        // 1. FIREBASE CONFIGURATION & IMPORTS
-        // ==========================================
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
         import { getFirestore, doc, setDoc, getDoc, collection, onSnapshot, updateDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
-        // Boilerplate environment setup
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'luddoboss-default';
         let app, auth, db, user = null;
@@ -337,127 +311,83 @@
             db = getFirestore(app);
         }
 
-        // ==========================================
-        // 2. CONSTANTS & LUDO MATH (The 15x15 Grid)
-        // ==========================================
-        // Standard perimeter path: 52 steps. Mapped to [col, row] in a 0-14 grid.
-        const BOARD_PATH = [
-            [1,6],[2,6],[3,6],[4,6],[5,6], // Red path top (5)
-            [6,5],[6,4],[6,3],[6,2],[6,1],[6,0], // Green path left (6)
-            [7,0], [8,0], // Top tip (2)
-            [8,1],[8,2],[8,3],[8,4],[8,5],[8,6], // Green path right (6)
-            [9,6],[10,6],[11,6],[12,6],[13,6],[14,6], // Yellow path top (6)
-            [14,7], [14,8], // Right tip (2)
-            [13,8],[12,8],[11,8],[10,8],[9,8],[8,8], // Yellow path bottom (6)
-            [8,9],[8,10],[8,11],[8,12],[8,13],[8,14], // Blue path right (6)
-            [7,14], [6,14], // Bottom tip (2)
-            [6,13],[6,12],[6,11],[6,10],[6,9],[6,8], // Blue path left (6)
-            [5,8],[4,8],[3,8],[2,8],[1,8],[0,8], // Red path bottom (6)
-            [0,7] // Left tip (1) - Total: 5+6+2+6+6+2+6+6+2+6+6+1 = 54? Wait. Let's trace correctly.
-            // Correct Ludo standard path count is 52. Let's fix exact offsets.
-        ];
-        
-        // Exact 52 cells generated procedurally to avoid typos:
         function generatePath() {
             let p = [];
-            // Red start arm top row (Left to right)
             for(let i=1; i<=5; i++) p.push([i,6]);
-            // Green arm left col (Bottom to top)
             for(let i=5; i>=0; i--) p.push([6,i]);
-            p.push([7,0], [8,0]); // Top tip
-            // Green arm right col (Top to bottom)
+            p.push([7,0], [8,0]);
             for(let i=1; i<=5; i++) p.push([8,i]);
-            // Yellow arm top row (Left to right)
             for(let i=9; i<=14; i++) p.push([i,6]);
-            p.push([14,7], [14,8]); // Right tip
-            // Yellow arm bottom row (Right to left)
+            p.push([14,7], [14,8]);
             for(let i=13; i>=9; i--) p.push([i,8]);
-            // Blue arm right col (Top to bottom)
             for(let i=9; i<=14; i++) p.push([8,i]);
-            p.push([7,14], [6,14]); // Bottom tip
-            // Blue arm left col (Bottom to top)
+            p.push([7,14], [6,14]);
             for(let i=13; i>=9; i--) p.push([6,i]);
-            // Red arm bottom row (Right to left)
             for(let i=5; i>=1; i--) p.push([i,8]);
-            p.push([0,8], [0,7]); // Left tip
+            p.push([0,8], [0,7]);
             return p;
         }
-        const PATH = generatePath(); // length 52
         
-        // Home stretches (5 cells each)
+        const PATH = generatePath();
         const HOME_PATHS = {
             red: [[1,7],[2,7],[3,7],[4,7],[5,7]],
             green: [[7,1],[7,2],[7,3],[7,4],[7,5]],
             yellow: [[13,7],[12,7],[11,7],[10,7],[9,7]],
             blue: [[7,13],[7,12],[7,11],[7,10],[7,9]]
         };
-        
-        // Yard positions
         const YARD_POS = {
             red: [[2,2],[2,3],[3,2],[3,3]],
             green: [[11,2],[11,3],[12,2],[12,3]],
             yellow: [[11,11],[11,12],[12,11],[12,12]],
             blue: [[2,11],[2,12],[3,11],[3,12]]
         };
-        
         const COLOR_START_INDEX = { red: 0, green: 13, yellow: 26, blue: 39 };
         const SAFE_ZONES = [0, 8, 13, 21, 26, 34, 39, 47];
         const COLORS = ['red', 'green', 'yellow', 'blue'];
 
-        // ==========================================
-        // 3. AUDIO SYNTHESIZER (No external assets)
-        // ==========================================
         const AudioEngine = {
             ctx: null,
             enabled: true,
-            init() { if(!this.ctx) this.ctx = new (window.AudioContext || window.webkitAudioContext)(); },
+            init() { 
+                if(!this.ctx) {
+                    try { this.ctx = new (window.AudioContext || window.webkitAudioContext)(); } 
+                    catch(e) { this.enabled = false; }
+                } 
+            },
             playTone(freq, type, duration, vol=0.1) {
-                if(!this.enabled || !this.ctx) return;
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
-                osc.type = type; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
-                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
-                osc.connect(gain); gain.connect(this.ctx.destination);
-                osc.start(); osc.stop(this.ctx.currentTime + duration);
+                if(!this.enabled || !this.ctx || this.ctx.state === 'suspended') return;
+                try {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = type; osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                    gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + duration);
+                    osc.connect(gain); gain.connect(this.ctx.destination);
+                    osc.start(); osc.stop(this.ctx.currentTime + duration);
+                } catch(e) {}
             },
             playDice() {
                 this.init();
+                if(this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
                 for(let i=0; i<5; i++) setTimeout(()=>this.playTone(400 + Math.random()*200, 'square', 0.05, 0.05), i*50);
             },
             playMove() { this.init(); this.playTone(600, 'sine', 0.1); },
             playCapture() { this.init(); this.playTone(200, 'sawtooth', 0.3, 0.2); setTimeout(()=>this.playTone(150, 'sawtooth', 0.4, 0.2), 100); },
-            playWin() {
-                this.init();
-                [440, 554, 659, 880].forEach((f, i) => setTimeout(()=>this.playTone(f, 'sine', 0.3, 0.1), i*150));
-            }
+            playWin() { this.init(); [440, 554, 659, 880].forEach((f, i) => setTimeout(()=>this.playTone(f, 'sine', 0.3, 0.1), i*150)); }
         };
 
-        // ==========================================
-        // 4. GAME STATE MANAGEMENT
-        // ==========================================
         let State = {
-            mode: 'local', // local, bot, online
-            roomId: null,
-            roomCode: null,
-            myColor: 'red', // Only matters for online
-            host: true, // Am I managing bots/logic?
-            
-            // Core playable state synced to Firebase
+            mode: 'local',
+            roomId: null, roomCode: null, myColor: 'red', host: true,
             game: {
-                status: 'waiting', // waiting, playing, finished
-                turnIndex: 0,
-                diceValue: 0,
-                diceRolled: false,
-                earnedExtraTurn: false,
+                status: 'waiting', turnIndex: 0, diceValue: 0, diceRolled: false, earnedExtraTurn: false,
                 players: {
                     red: { type: 'human', uid: 'local_1', name: 'Player 1', active: true },
                     green: { type: 'bot', uid: 'bot_1', name: 'Bot', active: true },
                     yellow: { type: 'none', uid: null, name: '', active: false },
                     blue: { type: 'none', uid: null, name: '', active: false }
                 },
-                tokens: [], // Flat array of 16 tokens
-                lastAction: Date.now()
+                tokens: [], lastAction: Date.now()
             }
         };
 
@@ -465,34 +395,22 @@
             let id = 0;
             State.game.tokens = [];
             COLORS.forEach(c => {
-                for(let i=0; i<4; i++) {
-                    State.game.tokens.push({ id: id++, color: c, pos: -1, isHome: false }); // pos -1 = yard, 0-50 = path, 51-55 = home path, 56 = home
-                }
+                for(let i=0; i<4; i++) { State.game.tokens.push({ id: id++, color: c, pos: -1, isHome: false }); }
             });
-            State.game.turnIndex = 0;
-            State.game.diceValue = 0;
-            State.game.diceRolled = false;
-            State.game.status = 'playing';
-            State.game.lastAction = Date.now();
+            State.game.turnIndex = 0; State.game.diceValue = 0; State.game.diceRolled = false;
+            State.game.status = 'playing'; State.game.lastAction = Date.now();
         }
 
-        // ==========================================
-        // 5. GAME ENGINE (LUDO LOGIC)
-        // ==========================================
         const Game = {
             initBoardUI() {
-                // Draw cells for paths to style them
                 const pathsContainer = document.getElementById('board-paths');
                 pathsContainer.innerHTML = '';
                 PATH.forEach((p, i) => {
                     let div = document.createElement('div');
                     div.className = `cell absolute bg-white dark:bg-gray-800 shadow-sm border border-gray-200 dark:border-gray-700`;
-                    div.style.left = `${p[0] * 100/15}%`;
-                    div.style.top = `${p[1] * 100/15}%`;
-                    div.style.width = `${100/15}%`;
-                    div.style.height = `${100/15}%`;
+                    div.style.left = `${p[0] * 100/15}%`; div.style.top = `${p[1] * 100/15}%`;
+                    div.style.width = `${100/15}%`; div.style.height = `${100/15}%`;
                     
-                    // Mark starts and safes
                     if(SAFE_ZONES.includes(i)) {
                         let col = Object.keys(COLOR_START_INDEX).find(k => COLOR_START_INDEX[k] === i);
                         if(col) {
@@ -506,14 +424,13 @@
                     pathsContainer.appendChild(div);
                 });
                 
-                // Draw Home Paths
                 Object.keys(HOME_PATHS).forEach(color => {
                     HOME_PATHS[color].forEach((p, idx) => {
                         let div = document.createElement('div');
                         div.className = `cell absolute bg-${color === 'red'? 'red': color === 'green'?'green': color==='yellow'?'yellow':'blue'}-200 dark:bg-${color === 'red'? 'red': color === 'green'?'green': color==='yellow'?'yellow':'blue'}-900 opacity-60 border border-white/50`;
                         div.style.left = `${p[0] * 100/15}%`; div.style.top = `${p[1] * 100/15}%`;
                         div.style.width = `${100/15}%`; div.style.height = `${100/15}%`;
-                        if(idx === 4) div.innerHTML = `<i class="ph-fill ph-check-circle text-white opacity-80"></i>`; // Target
+                        if(idx === 4) div.innerHTML = `<i class="ph-fill ph-check-circle text-white opacity-80"></i>`;
                         pathsContainer.appendChild(div);
                     });
                 });
@@ -524,16 +441,13 @@
                 if(layer.children.length === 0) {
                     State.game.tokens.forEach(t => {
                         let el = document.createElement('div');
-                        el.id = `token-${t.id}`;
-                        el.className = `token token-${t.color}`;
+                        el.id = `token-${t.id}`; el.className = `token token-${t.color}`;
                         el.onclick = () => this.handleTokenClick(t.id);
                         layer.appendChild(el);
                     });
                 }
                 
-                // Group tokens by physical coordinate to handle overlaps
                 let cellCounts = {};
-                
                 State.game.tokens.forEach(t => {
                     let el = document.getElementById(`token-${t.id}`);
                     if(!el) return;
@@ -543,40 +457,25 @@
                     if(!cellCounts[key]) cellCounts[key] = [];
                     cellCounts[key].push(el);
                     
-                    // Reset interactive state
                     el.classList.remove('interactive', 'pointer-events-auto');
                     
-                    // Highlight movable tokens if it's my turn
                     if(State.game.status === 'playing' && State.game.diceRolled && this.isMyTurnControls()) {
-                        let currentTurnColor = COLORS[State.game.turnIndex];
-                        if(t.color === currentTurnColor) {
-                            if(this.isValidMove(t, State.game.diceValue)) {
-                                el.classList.add('interactive', 'pointer-events-auto');
-                            }
+                        if(t.color === COLORS[State.game.turnIndex] && this.isValidMove(t, State.game.diceValue)) {
+                            el.classList.add('interactive', 'pointer-events-auto');
                         }
                     }
                 });
                 
-                // Apply positions and scaling for overlaps
                 Object.keys(cellCounts).forEach(key => {
-                    let tokens = cellCounts[key];
-                    let count = tokens.length;
+                    let tokens = cellCounts[key]; let count = tokens.length;
                     let coords = key.split(',').map(Number);
                     
                     tokens.forEach((el, i) => {
-                        el.style.left = `${coords[0] * 100/15}%`;
-                        el.style.top = `${coords[1] * 100/15}%`;
-                        
-                        // Overlap logic
-                        if(count === 1) {
-                            el.style.transform = `scale(1) translate(0, 0)`;
-                        } else if(count === 2) {
-                            el.style.transform = `scale(0.8) translate(${i===0?-20:20}%, ${i===0?-20:20}%)`;
-                        } else if(count === 3) {
-                            el.style.transform = `scale(0.7) translate(${i===0?-20:i===1?20:0}%, ${i===0?-20:i===1?-20:30}%)`;
-                        } else {
-                            el.style.transform = `scale(0.6) translate(${i%2===0?-25:25}%, ${i<2?-25:25}%)`;
-                        }
+                        el.style.left = `${coords[0] * 100/15}%`; el.style.top = `${coords[1] * 100/15}%`;
+                        if(count === 1) el.style.transform = `scale(1) translate(0, 0)`;
+                        else if(count === 2) el.style.transform = `scale(0.8) translate(${i===0?-20:20}%, ${i===0?-20:20}%)`;
+                        else if(count === 3) el.style.transform = `scale(0.7) translate(${i===0?-20:i===1?20:0}%, ${i===0?-20:i===1?-20:30}%)`;
+                        else el.style.transform = `scale(0.6) translate(${i%2===0?-25:25}%, ${i<2?-25:25}%)`;
                     });
                 });
             },
@@ -585,16 +484,10 @@
                 if(t.isHome) return [7,7];
                 if(t.pos === -1) {
                     let idx = State.game.tokens.filter(x => x.color === t.color && x.pos === -1).indexOf(t);
-                    if(idx === -1) idx = 0; // fallback
-                    return YARD_POS[t.color][idx % 4];
+                    return YARD_POS[t.color][idx === -1 ? 0 : idx % 4];
                 }
-                if(t.pos >= 0 && t.pos <= 50) {
-                    let globalIdx = (COLOR_START_INDEX[t.color] + t.pos) % 52;
-                    return PATH[globalIdx];
-                }
-                if(t.pos >= 51 && t.pos <= 55) {
-                    return HOME_PATHS[t.color][t.pos - 51];
-                }
+                if(t.pos >= 0 && t.pos <= 50) return PATH[(COLOR_START_INDEX[t.color] + t.pos) % 52];
+                if(t.pos >= 51 && t.pos <= 55) return HOME_PATHS[t.color][t.pos - 51];
                 return [7,7];
             },
 
@@ -603,11 +496,7 @@
                 let p = State.game.players[currentTurnColor];
                 if(State.mode === 'local') return p.type === 'human';
                 if(State.mode === 'bot') return p.type === 'human';
-                // Online: Only host controls bots, humans control themselves
-                if(State.mode === 'online') {
-                    if(p.type === 'human' && State.myColor === currentTurnColor) return true;
-                    // Note: bot logic handled elsewhere
-                }
+                if(State.mode === 'online') return p.type === 'human' && State.myColor === currentTurnColor;
                 return false;
             },
             
@@ -615,41 +504,32 @@
                 if(State.game.status !== 'playing') return;
                 if(State.game.diceRolled) return;
                 if(!this.isMyTurnControls()) return;
-                
                 this.rollDice();
             },
             
             rollDice() {
                 AudioEngine.playDice();
                 let val = Math.floor(Math.random() * 6) + 1;
-                // Cheat mode for testing: val = 6;
                 State.game.diceValue = val;
                 State.game.diceRolled = true;
                 State.game.lastAction = Date.now();
                 
                 this.syncState();
-                UI.animateDice(val, () => {
-                    this.checkMovesAfterRoll();
-                });
+                UI.animateDice(val, () => { this.checkMovesAfterRoll(); });
             },
             
             checkMovesAfterRoll() {
                 let currentTurnColor = COLORS[State.game.turnIndex];
-                let myTokens = State.game.tokens.filter(t => t.color === currentTurnColor);
-                let validTokens = myTokens.filter(t => this.isValidMove(t, State.game.diceValue));
+                let validTokens = State.game.tokens.filter(t => t.color === currentTurnColor && this.isValidMove(t, State.game.diceValue));
                 
                 if(validTokens.length === 0) {
                     UI.showToast("No valid moves!");
                     setTimeout(() => this.nextTurn(), 1000);
-                } else if(validTokens.length === 1 && State.game.players[currentTurnColor].type !== 'human') {
-                    // Bot auto move
-                    setTimeout(() => this.executeMove(validTokens[0]), 500);
-                } else if(validTokens.length === 1 && State.mode === 'local') {
-                    // Optional: auto move for human if only 1 option
-                    // setTimeout(() => this.executeMove(validTokens[0]), 300);
-                    this.renderTokens();
+                } else if(validTokens.length === 1 && (State.game.players[currentTurnColor].type !== 'human' || this.isMyTurnControls())) {
+                    // Auto-move if only 1 valid option (for bot OR human to speed up gameplay)
+                    setTimeout(() => this.executeMove(validTokens[0]), 400);
                 } else {
-                    this.renderTokens();
+                    this.renderTokens(); // Will highlight interactive tokens for human
                     if(State.game.players[currentTurnColor].type === 'bot' && State.host) {
                         Bot.playTurn(currentTurnColor, validTokens);
                     }
@@ -659,19 +539,14 @@
             isValidMove(t, dice) {
                 if(t.isHome) return false;
                 if(t.pos === -1) return dice === 6;
-                if(t.pos + dice > 56) return false; // Overshoot home
+                if(t.pos + dice > 56) return false;
                 return true;
             },
             
             handleTokenClick(tokenId) {
-                if(!State.game.diceRolled || State.game.status !== 'playing') return;
-                if(!this.isMyTurnControls()) return;
-                
+                if(!State.game.diceRolled || State.game.status !== 'playing' || !this.isMyTurnControls()) return;
                 let t = State.game.tokens.find(x => x.id === tokenId);
-                let currentTurnColor = COLORS[State.game.turnIndex];
-                if(t.color !== currentTurnColor) return;
-                
-                if(this.isValidMove(t, State.game.diceValue)) {
+                if(t && t.color === COLORS[State.game.turnIndex] && this.isValidMove(t, State.game.diceValue)) {
                     this.executeMove(t);
                 }
             },
@@ -681,12 +556,12 @@
                 let startPos = t.pos;
                 let targetPos = startPos === -1 ? 0 : startPos + dice;
                 
-                // Animation Step by step
+                document.querySelectorAll('.interactive').forEach(el => el.classList.remove('interactive', 'pointer-events-auto'));
+                
                 let currentPos = startPos;
                 let step = () => {
                     if(currentPos < targetPos) {
                         currentPos++;
-                        if(startPos === -1 && currentPos > 0) currentPos = 0; // jump out of yard
                         t.pos = currentPos;
                         if(currentPos === 56) t.isHome = true;
                         AudioEngine.playMove();
@@ -696,36 +571,20 @@
                         this.finishMove(t);
                     }
                 };
-                
-                // Remove interactive state
-                document.querySelectorAll('.interactive').forEach(el => el.classList.remove('interactive', 'pointer-events-auto'));
                 step();
             },
             
             finishMove(t) {
-                let captured = false;
-                
-                // Check win condition for token
                 if(t.isHome) {
                     State.game.earnedExtraTurn = true;
                     AudioEngine.playWin();
                     UI.showToast("Token Reached Home!");
-                } 
-                // Check captures if on main path
-                else if(t.pos >= 0 && t.pos <= 50) {
+                } else if(t.pos >= 0 && t.pos <= 50) {
                     let globalIdx = (COLOR_START_INDEX[t.color] + t.pos) % 52;
                     if(!SAFE_ZONES.includes(globalIdx)) {
-                        // Find opponent tokens on same global index
-                        let enemies = State.game.tokens.filter(e => 
-                            e.color !== t.color && 
-                            e.pos >= 0 && e.pos <= 50 &&
-                            ((COLOR_START_INDEX[e.color] + e.pos) % 52) === globalIdx
-                        );
+                        let enemies = State.game.tokens.filter(e => e.color !== t.color && e.pos >= 0 && e.pos <= 50 && ((COLOR_START_INDEX[e.color] + e.pos) % 52) === globalIdx);
                         if(enemies.length > 0) {
-                            enemies.forEach(e => {
-                                e.pos = -1; // Send back to yard
-                            });
-                            captured = true;
+                            enemies.forEach(e => e.pos = -1);
                             State.game.earnedExtraTurn = true;
                             AudioEngine.playCapture();
                             UI.showToast("Captured!");
@@ -735,9 +594,7 @@
                 
                 if(State.game.diceValue === 6) State.game.earnedExtraTurn = true;
                 
-                // Check Game Over
-                let myTokens = State.game.tokens.filter(x => x.color === t.color);
-                if(myTokens.every(x => x.isHome)) {
+                if(State.game.tokens.filter(x => x.color === t.color).every(x => x.isHome)) {
                     State.game.status = 'finished';
                     this.syncState();
                     UI.showWinner(State.game.players[t.color].name || t.color);
@@ -768,7 +625,6 @@
                 UI.updateGameHeaders();
                 this.renderTokens();
                 
-                // If next is bot and I am host, trigger bot
                 let nextColor = COLORS[State.game.turnIndex];
                 if(State.game.players[nextColor].type === 'bot' && State.host) {
                     setTimeout(() => Bot.triggerRoll(nextColor), 1000);
@@ -776,73 +632,49 @@
             },
             
             syncState() {
-                // Save locally
-                localStorage.setItem('ludo_save', JSON.stringify(State.game));
+                try { localStorage.setItem('ludo_save', JSON.stringify(State.game)); } 
+                catch(e) { console.warn("Local storage disabled by environment"); }
                 
-                // Save to Firebase if online
                 if(State.mode === 'online' && State.roomId && db) {
-                    // Only write if we are controlling this action to avoid loops
-                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId), {
-                        game: State.game
-                    }).catch(e => console.error("Sync error", e));
+                    updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId), { game: State.game }).catch(e => {});
                 }
-                
                 UI.updateGameHeaders();
             },
             
             sendEmoji(emoji) {
                 if(State.mode !== 'online') return;
-                updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId), {
-                    lastEmoji: { emoji, sender: State.myColor, ts: Date.now() }
-                });
+                updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId), { lastEmoji: { emoji, sender: State.myColor, ts: Date.now() } });
                 UI.hideEmojiPicker();
             }
         };
 
-        // ==========================================
-        // 6. BOT AI ENGINE
-        // ==========================================
         const Bot = {
             triggerRoll(color) {
-                if(State.game.status !== 'playing') return;
-                if(COLORS[State.game.turnIndex] !== color) return;
-                Game.rollDice(); // UI handles the delay and callback to checkMoves
+                if(State.game.status === 'playing' && COLORS[State.game.turnIndex] === color) Game.rollDice();
             },
             playTurn(color, validTokens) {
-                // Hardcoded medium logic: Prioritize safe/captures
                 let bestToken = validTokens[0];
                 let bestScore = -999;
                 
                 validTokens.forEach(t => {
                     let score = 0;
                     let targetPos = t.pos === -1 ? 0 : t.pos + State.game.diceValue;
-                    
-                    if(targetPos === 56) score += 1000; // Win token
-                    if(t.pos === -1) score += 50; // Get out of yard
+                    if(targetPos === 56) score += 1000;
+                    if(t.pos === -1) score += 50;
                     
                     if(targetPos >= 0 && targetPos <= 50) {
                         let globalTarget = (COLOR_START_INDEX[color] + targetPos) % 52;
-                        if(SAFE_ZONES.includes(globalTarget)) score += 30; // Reach safe zone
-                        
-                        // Check capture
-                        let enemies = State.game.tokens.filter(e => 
-                            e.color !== color && e.pos >= 0 && e.pos <= 50 &&
-                            ((COLOR_START_INDEX[e.color] + e.pos) % 52) === globalTarget
-                        );
+                        if(SAFE_ZONES.includes(globalTarget)) score += 30;
+                        let enemies = State.game.tokens.filter(e => e.color !== color && e.pos >= 0 && e.pos <= 50 && ((COLOR_START_INDEX[e.color] + e.pos) % 52) === globalTarget);
                         if(enemies.length > 0 && !SAFE_ZONES.includes(globalTarget)) score += 100;
                     }
-                    score += targetPos; // Prefer moving forward
-                    
+                    score += targetPos;
                     if(score > bestScore) { bestScore = score; bestToken = t; }
                 });
-                
                 setTimeout(() => Game.executeMove(bestToken), 1000);
             }
         };
 
-        // ==========================================
-        // 7. UI CONTROLLER
-        // ==========================================
         const UI = {
             init() {
                 Game.initBoardUI();
@@ -857,9 +689,7 @@
             },
             
             showScreen(id) {
-                ['screen-menu', 'screen-online-menu', 'screen-lobby', 'screen-game'].forEach(s => {
-                    document.getElementById(s).classList.add('hidden');
-                });
+                ['screen-menu', 'screen-online-menu', 'screen-lobby', 'screen-game'].forEach(s => document.getElementById(s).classList.add('hidden'));
                 document.getElementById(id).classList.remove('hidden');
             },
             
@@ -869,7 +699,7 @@
                 el.className = 'bg-black/80 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg backdrop-blur text-center transition-all duration-300 transform scale-0';
                 el.innerText = msg;
                 container.appendChild(el);
-                requestAnimationFrame(() => el.classList.remove('scale-0'));
+                requestAnimationFrame(() => requestAnimationFrame(() => el.classList.remove('scale-0')));
                 setTimeout(() => {
                     el.classList.add('opacity-0', '-translate-y-4');
                     setTimeout(() => el.remove(), 300);
@@ -881,47 +711,37 @@
                 const btn = document.getElementById('dice-btn');
                 btn.disabled = true;
                 
-                // Spin animation class
-                dice.classList.add('animate-spin-fast');
+                dice.classList.add('rolling-dice');
                 
                 setTimeout(() => {
-                    dice.classList.remove('animate-spin-fast');
+                    dice.classList.remove('rolling-dice');
                     
-                    // Draw dots based on value
                     const face = dice.querySelector('.dice-face');
                     face.innerHTML = '';
                     const dotsMatrix = {
-                        1: [[2,2]],
-                        2: [[1,1], [3,3]],
-                        3: [[1,1], [2,2], [3,3]],
-                        4: [[1,1], [1,3], [3,1], [3,3]],
-                        5: [[1,1], [1,3], [2,2], [3,1], [3,3]],
-                        6: [[1,1], [1,2], [1,3], [3,1], [3,2], [3,3]]
+                        1: [[2,2]], 2: [[1,1], [3,3]], 3: [[1,1], [2,2], [3,3]],
+                        4: [[1,1], [1,3], [3,1], [3,3]], 5: [[1,1], [1,3], [2,2], [3,1], [3,3]], 6: [[1,1], [1,2], [1,3], [3,1], [3,2], [3,3]]
                     };
                     dotsMatrix[value].forEach(pos => {
                         let dot = document.createElement('div');
                         dot.className = 'dot';
-                        dot.style.gridColumnStart = pos[0];
-                        dot.style.gridRowStart = pos[1];
+                        dot.style.gridColumnStart = pos[0]; dot.style.gridRowStart = pos[1];
                         face.appendChild(dot);
                     });
                     
                     if(callback) callback();
                     btn.disabled = false;
-                }, 600);
+                }, 500);
             },
             
             updateGameHeaders() {
                 let currentTurnColor = COLORS[State.game.turnIndex];
                 let p = State.game.players[currentTurnColor];
                 
-                let badge = document.getElementById('turn-indicator-badge');
-                badge.innerHTML = `<span class="px-4 py-1 rounded-full text-sm font-bold text-white shadow-md uppercase tracking-wider bg-${currentTurnColor}-500">${p.name}'s Turn</span>`;
+                document.getElementById('turn-indicator-badge').innerHTML = `<span class="px-4 py-1 rounded-full text-sm font-bold text-white shadow-md uppercase tracking-wider bg-${currentTurnColor}-500">${p.name}'s Turn</span>`;
                 
-                // Dice button state
-                const diceBtn = document.getElementById('dice-btn');
-                const diceFace = document.querySelector('.dice-face');
                 const instruction = document.getElementById('dice-instruction');
+                const diceFace = document.querySelector('.dice-face');
                 
                 if(Game.isMyTurnControls() && !State.game.diceRolled) {
                     instruction.innerText = "Roll Dice!";
@@ -932,7 +752,6 @@
                     diceFace.style.borderColor = '';
                 }
                 
-                // Update player profiles mini
                 const container = document.getElementById('game-player-profiles');
                 container.innerHTML = '';
                 COLORS.forEach((c, idx) => {
@@ -977,10 +796,7 @@
                                     ${isMe ? '<span class="text-[10px] bg-brand-500 text-white px-1 rounded ml-1">YOU</span>' : ''}
                                 </div>
                             </div>
-                            <div class="flex items-center gap-2">
-                                ${typeSel}
-                                ${(State.host || State.mode!=='online') ? activeBtn : ''}
-                            </div>
+                            <div class="flex items-center gap-2">${typeSel}${(State.host || State.mode!=='online') ? activeBtn : ''}</div>
                         </div>
                     `;
                 });
@@ -995,29 +811,27 @@
             toggleTheme() {
                 const html = document.documentElement;
                 const icon = document.getElementById('theme-icon');
+                html.classList.toggle('dark');
                 if(html.classList.contains('dark')) {
-                    html.classList.remove('dark');
-                    icon.classList.replace('ph-moon', 'ph-sun');
-                    localStorage.setItem('theme', 'light');
-                } else {
-                    html.classList.add('dark');
                     icon.classList.replace('ph-sun', 'ph-moon');
-                    localStorage.setItem('theme', 'dark');
+                    try { localStorage.setItem('theme', 'dark'); } catch(e){}
+                } else {
+                    icon.classList.replace('ph-moon', 'ph-sun');
+                    try { localStorage.setItem('theme', 'light'); } catch(e){}
                 }
             },
             updateTheme() {
-                if(localStorage.getItem('theme') === 'light') {
-                    document.documentElement.classList.remove('dark');
-                    document.getElementById('theme-icon').classList.replace('ph-moon', 'ph-sun');
-                }
+                try {
+                    if(localStorage.getItem('theme') === 'light') {
+                        document.documentElement.classList.remove('dark');
+                        document.getElementById('theme-icon').classList.replace('ph-moon', 'ph-sun');
+                    }
+                } catch(e) {}
             },
             showEmojiPicker() { document.getElementById('emoji-picker').classList.remove('hidden'); },
             hideEmojiPicker() { document.getElementById('emoji-picker').classList.add('hidden'); }
         };
 
-        // ==========================================
-        // 8. APP LOGIC & ONLINE DB SYNC
-        // ==========================================
         let unsubscribeRoom = null;
 
         window.App = {
@@ -1026,24 +840,15 @@
                 if(!user) {
                     try {
                         let token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-                        if(token) await signInWithCustomToken(auth, token);
-                        else await signInAnonymously(auth);
+                        if(token) await signInWithCustomToken(auth, token); else await signInAnonymously(auth);
                         user = auth.currentUser;
-                    } catch(e) {
-                        console.error("Auth error", e);
-                        UI.showToast("Connection failed");
-                        return false;
-                    }
+                    } catch(e) { UI.showToast("Connection failed"); return false; }
                 }
                 return true;
             },
             
             showLobby(mode) {
-                State.mode = mode;
-                State.host = true;
-                State.roomId = null;
-                
-                // Set default players based on mode
+                State.mode = mode; State.host = true; State.roomId = null;
                 State.game.players = {
                     red: { type: 'human', uid: 'local', name: 'Player 1', active: true },
                     green: { type: mode==='bot'?'bot':'human', uid: mode==='bot'?'bot':'local', name: mode==='bot'?'Bot 1':'Player 2', active: true },
@@ -1055,21 +860,15 @@
                 document.getElementById('lobby-subtitle').innerText = 'Configure players';
                 document.getElementById('lobby-code-banner').classList.add('hidden');
                 
-                UI.renderLobbyPlayers();
-                UI.showScreen('screen-lobby');
+                UI.renderLobbyPlayers(); UI.showScreen('screen-lobby');
             },
             
             showOnlineMenu() { UI.showScreen('screen-online-menu'); },
             
             async createOnlineRoom() {
                 if(!await this.initFirebase()) return;
-                
                 const code = Math.floor(10000 + Math.random() * 90000).toString();
-                State.roomId = `room_${code}`;
-                State.roomCode = code;
-                State.mode = 'online';
-                State.host = true;
-                State.myColor = 'red';
+                State.roomId = `room_${code}`; State.roomCode = code; State.mode = 'online'; State.host = true; State.myColor = 'red';
                 
                 State.game.players = {
                     red: { type: 'human', uid: user.uid, name: 'Me (Host)', active: true },
@@ -1077,16 +876,10 @@
                     yellow: { type: 'none', uid: null, name: 'Waiting...', active: false },
                     blue: { type: 'none', uid: null, name: 'Waiting...', active: false }
                 };
-                resetGameState();
-                State.game.status = 'lobby';
+                resetGameState(); State.game.status = 'lobby';
                 
-                // Write to DB Rule 1 compliance
-                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId), {
-                    code: code, hostId: user.uid, createdAt: serverTimestamp(), game: State.game
-                });
-                
-                this.listenToRoom();
-                this.setupOnlineLobbyUI();
+                await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId), { code: code, hostId: user.uid, createdAt: serverTimestamp(), game: State.game });
+                this.listenToRoom(); this.setupOnlineLobbyUI();
             },
             
             async joinOnlineRoom() {
@@ -1094,35 +887,26 @@
                 const code = document.getElementById('join-room-code').value;
                 if(code.length !== 5) { UI.showToast("Invalid 5-digit code"); return; }
                 
-                State.roomId = `room_${code}`;
-                State.roomCode = code;
-                State.mode = 'online';
-                State.host = false;
+                State.roomId = `room_${code}`; State.roomCode = code; State.mode = 'online'; State.host = false;
                 
-                // Try to get doc
                 const d = await getDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId));
                 if(!d.exists()) { UI.showToast("Room not found!"); return; }
                 
                 let data = d.data();
                 if(data.game.status === 'playing') { UI.showToast("Game already in progress!"); return; }
                 
-                // Find empty slot
                 let availableColor = null;
-                for(let c of COLORS) {
-                    if(!data.game.players[c].active) { availableColor = c; break; }
-                }
-                
+                for(let c of COLORS) { if(!data.game.players[c].active) { availableColor = c; break; } }
                 if(!availableColor) { UI.showToast("Room is full!"); return; }
-                State.myColor = availableColor;
                 
-                // Update doc to join
+                State.myColor = availableColor;
                 data.game.players[availableColor] = { type: 'human', uid: user.uid, name: `Player ${user.uid.slice(0,3)}`, active: true };
+                
                 await updateDoc(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId), {
                     [`game.players.${availableColor}`]: data.game.players[availableColor]
                 });
                 
-                this.listenToRoom();
-                this.setupOnlineLobbyUI();
+                this.listenToRoom(); this.setupOnlineLobbyUI();
             },
             
             setupOnlineLobbyUI() {
@@ -1131,74 +915,43 @@
                 document.getElementById('lobby-code-banner').classList.remove('hidden');
                 document.getElementById('lobby-room-code').innerText = State.roomCode;
                 document.getElementById('start-game-btn').style.display = State.host ? 'block' : 'none';
-                
-                UI.renderLobbyPlayers();
-                UI.showScreen('screen-lobby');
+                UI.renderLobbyPlayers(); UI.showScreen('screen-lobby');
             },
             
             listenToRoom() {
                 if(unsubscribeRoom) unsubscribeRoom();
                 unsubscribeRoom = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'rooms', State.roomId), (docSnap) => {
-                    if(!docSnap.exists()) {
-                        UI.showToast("Room closed by host.");
-                        this.leaveRoom();
-                        return;
-                    }
+                    if(!docSnap.exists()) { UI.showToast("Room closed."); this.leaveRoom(); return; }
                     let data = docSnap.data();
                     
-                    // Handle Emoji
                     if(data.lastEmoji && data.lastEmoji.ts > (State.lastEmojiTs || 0)) {
                         State.lastEmojiTs = data.lastEmoji.ts;
-                        if(data.lastEmoji.sender !== State.myColor) {
-                            UI.showToast(`${data.game.players[data.lastEmoji.sender].name}: ${data.lastEmoji.emoji}`);
-                        }
+                        if(data.lastEmoji.sender !== State.myColor) UI.showToast(`${data.game.players[data.lastEmoji.sender].name}: ${data.lastEmoji.emoji}`);
                     }
                     
-                    // Sync State
                     if(data.game.lastAction > (State.game.lastAction || 0) || data.game.status !== State.game.status) {
                         State.game = data.game;
-                        
-                        if(State.game.status === 'lobby') {
-                            UI.renderLobbyPlayers();
-                        } else if(State.game.status === 'playing') {
-                            if(document.getElementById('screen-game').classList.contains('hidden')) {
-                                UI.showScreen('screen-game');
-                            }
-                            UI.updateGameHeaders();
-                            Game.renderTokens();
-                        } else if(State.game.status === 'finished') {
-                            UI.showWinner("A Player"); // Better win detection possible
-                        }
+                        if(State.game.status === 'lobby') UI.renderLobbyPlayers();
+                        else if(State.game.status === 'playing') {
+                            if(document.getElementById('screen-game').classList.contains('hidden')) UI.showScreen('screen-game');
+                            UI.updateGameHeaders(); Game.renderTokens();
+                        } 
+                        else if(State.game.status === 'finished') UI.showWinner("A Player");
                     }
-                }, (error) => {
-                    console.error("Listen error", error);
-                    UI.showToast("Sync connection lost");
-                });
+                }, () => { UI.showToast("Sync connection lost"); });
             },
             
             toggleLobbyPlayer(color) {
                 if(!State.host) return;
                 let p = State.game.players[color];
-                if(p.active && Object.values(State.game.players).filter(x=>x.active).length <= 2) {
-                    UI.showToast("Minimum 2 players required"); return;
-                }
+                if(p.active && Object.values(State.game.players).filter(x=>x.active).length <= 2) { UI.showToast("Minimum 2 players required"); return; }
                 p.active = !p.active;
                 if(p.active) { p.type = State.mode==='bot'?'bot':'human'; p.name = p.type==='bot'?'Bot':'Player'; }
-                
-                UI.renderLobbyPlayers();
-                if(State.mode === 'online') Game.syncState();
+                UI.renderLobbyPlayers(); if(State.mode === 'online') Game.syncState();
             },
             
-            changePlayerType(color, type) {
-                if(!State.host) return;
-                State.game.players[color].type = type;
-                if(State.mode === 'online') Game.syncState();
-            },
-            
-            changePlayerName(color, name) {
-                State.game.players[color].name = name.slice(0, 10);
-                if(State.mode === 'online') Game.syncState();
-            },
+            changePlayerType(color, type) { if(!State.host) return; State.game.players[color].type = type; if(State.mode === 'online') Game.syncState(); },
+            changePlayerName(color, name) { State.game.players[color].name = name.slice(0, 10); if(State.mode === 'online') Game.syncState(); },
             
             copyRoomCode() {
                 let d = document.createElement("input");
@@ -1212,16 +965,9 @@
                 if(activeCount < 2) { UI.showToast("Need at least 2 players!"); return; }
                 
                 if(State.mode !== 'online') resetGameState();
-                else {
-                    State.game.status = 'playing';
-                    State.game.lastAction = Date.now();
-                    resetGameState(); // Resets tokens
-                }
+                else { State.game.status = 'playing'; State.game.lastAction = Date.now(); resetGameState(); }
                 
-                Game.syncState();
-                UI.showScreen('screen-game');
-                UI.updateGameHeaders();
-                Game.renderTokens();
+                Game.syncState(); UI.showScreen('screen-game'); UI.updateGameHeaders(); Game.renderTokens();
                 
                 if(State.game.players[COLORS[State.game.turnIndex]].type === 'bot' && State.host) {
                     setTimeout(() => Bot.triggerRoll(COLORS[State.game.turnIndex]), 1000);
@@ -1230,23 +976,15 @@
             
             rematch() {
                 document.getElementById('winner-overlay').classList.add('hidden');
-                resetGameState();
-                Game.syncState();
-                UI.updateGameHeaders();
-                Game.renderTokens();
+                resetGameState(); Game.syncState(); UI.updateGameHeaders(); Game.renderTokens();
             },
             
             leaveRoom() {
                 if(unsubscribeRoom) unsubscribeRoom();
-                State.roomId = null;
-                UI.showScreen('screen-menu');
+                State.roomId = null; UI.showScreen('screen-menu');
             },
             
-            promptLeaveGame() {
-                if(confirm("Leave current game? Progress may be lost.")) {
-                    this.leaveRoom();
-                }
-            },
+            promptLeaveGame() { if(confirm("Leave current game? Progress may be lost.")) this.leaveRoom(); },
             
             toggleSound() {
                 AudioEngine.enabled = !AudioEngine.enabled;
@@ -1259,54 +997,24 @@
             showProfile() { UI.showToast("Profile features coming soon in v2!"); }
         };
 
-        // ==========================================
-        // 9. PWA & OFFLINE GENERATION (Single File Mandate)
-        // ==========================================
         const PWA = {
             init() {
                 try {
-                    // Generate Manifest
                     const manifest = {
-                        name: "LuddoBoss PWA", short_name: "LuddoBoss",
-                        start_url: ".", display: "standalone",
-                        background_color: "#1e293b", theme_color: "#ea580c",
+                        name: "LuddoBoss PWA", short_name: "LuddoBoss", start_url: ".", display: "standalone", background_color: "#1e293b", theme_color: "#ea580c",
                         icons: [{ src: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%23ea580c' rx='20'/%3E%3Ctext x='50' y='65' font-size='50' text-anchor='middle' fill='white'%3E🎲%3C/text%3E%3C/svg%3E", sizes: "512x512", type: "image/svg+xml", purpose: "any maskable" }]
                     };
                     const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/manifest+json'});
-                    const manifestUrl = URL.createObjectURL(manifestBlob);
-                    const link = document.createElement('link');
-                    link.rel = 'manifest'; link.href = manifestUrl;
+                    const link = document.createElement('link'); link.rel = 'manifest'; link.href = URL.createObjectURL(manifestBlob);
                     document.head.appendChild(link);
 
-                    // Note: Browsers block Service Workers from 'blob:' URLs for security reasons.
-                    // The inline SW hack has been removed to prevent console errors in the preview environment.
-                    // For a real PWA deployment, save the following as 'service-worker.js' in your root folder:
-                    /*
-                        const CACHE_NAME = 'luddoboss-v1';
-                        self.addEventListener('install', e => { self.skipWaiting(); });
-                        self.addEventListener('activate', e => { e.waitUntil(clients.claim()); });
-                        self.addEventListener('fetch', e => {
-                            if(e.request.method !== 'GET') return;
-                            e.respondWith(caches.match(e.request).then(res => res || fetch(e.request).then(fetchRes => {
-                                return caches.open(CACHE_NAME).then(cache => {
-                                    if(e.request.url.startsWith('http')) cache.put(e.request, fetchRes.clone());
-                                    return fetchRes;
-                                });
-                            })));
-                        });
-                    */
-                    
                     if ('serviceWorker' in navigator && !window.location.href.startsWith('blob:')) {
-                        navigator.serviceWorker.register('./service-worker.js').catch(() => {
-                            // Silently ignore registration failures (e.g. 404s in preview environment)
-                        });
+                        navigator.serviceWorker.register('./service-worker.js').catch(() => {});
                     }
 
-                    // Install Prompt Logic
                     let deferredPrompt;
                     window.addEventListener('beforeinstallprompt', (e) => {
-                        e.preventDefault();
-                        deferredPrompt = e;
+                        e.preventDefault(); deferredPrompt = e;
                         const btn = document.getElementById('install-pwa-btn');
                         btn.style.display = 'flex';
                         btn.onclick = async () => {
@@ -1316,20 +1024,19 @@
                             deferredPrompt = null;
                         };
                     });
-                } catch(e) { console.log("PWA init restricted by environment, skipping inline injection."); }
+                } catch(e) {}
             }
         };
 
-        // Boot
+        window.Game = Game;
+        window.UI = UI;
+        window.State = State;
+        window.Bot = Bot;
+
         window.onload = () => {
-            UI.init();
-            PWA.init();
-            
-            // Emoji click outside hiding
+            UI.init(); PWA.init();
             document.addEventListener('click', (e) => {
-                if(!e.target.closest('#emoji-picker') && !e.target.closest('.ph-smiley')) {
-                    UI.hideEmojiPicker();
-                }
+                if(!e.target.closest('#emoji-picker') && !e.target.closest('.ph-smiley')) UI.hideEmojiPicker();
             });
         };
     </script>
